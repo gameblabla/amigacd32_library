@@ -1,0 +1,8 @@
+doublespeed
+assign t: ram:
+assign env: ram:
+
+setpatch quiet
+cd game
+avail flush >nil:
+game

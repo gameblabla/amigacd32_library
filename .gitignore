@@ -1,0 +1,6 @@
+CD32.TM
+*.o
+cdda.raw
+*.iso
+*.a
+./game

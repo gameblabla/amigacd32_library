@@ -1,0 +1,21 @@
+CC = vc +aos68k
+EXE = game
+
+CFLAGS	= -Os -size -const-in-data -sd -no-intz -cpu=68020 -I/opt/amiga/m68k-amigaos/vbcc/include -I/opt/amiga/m68k-amigaos/ndk-include
+
+SRC = cd32.c main.c
+
+LDFLAGS = -lamiga
+
+OBJ = $(SRC:.c=.o)
+
+all : $(SRC) $(EXE)
+
+$(EXE): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $@ $(LDFLAGS)
+	
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(OBJ) $(EXE) *.iso cdda.raw
