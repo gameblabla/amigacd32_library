@@ -4,3 +4,4 @@ cdda.raw
 *.iso
 *.a
 ./game
+cdda_cd32/Game/game

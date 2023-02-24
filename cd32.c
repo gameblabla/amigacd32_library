@@ -39,9 +39,13 @@ struct ViewPort *vport;
 struct RastPort *rport;
 struct Window *window = NULL;
 struct Screen *screen = NULL;
+#ifdef SINGLE_BUFFER
+struct BitMap *myBitMaps;
+#else
 struct BitMap **myBitMaps;
-struct Library *IconBase = NULL;
 struct ScreenBuffer *sb[2];
+#endif
+struct Library *IconBase = NULL;
 
 void Play_CDDA_again();
 
@@ -70,6 +74,8 @@ LONG setupPlanes(struct BitMap *bitMap, LONG depth, LONG width, LONG height)
 	}
 	return(TRUE);
 }
+
+#ifndef SINGLE_BUFFER
 struct BitMap **setupBitMaps(LONG depth, LONG width, LONG height)
 {
 	static struct BitMap *myBitMaps[3];
@@ -100,16 +106,29 @@ struct BitMap **setupBitMaps(LONG depth, LONG width, LONG height)
 	}
 	return(NULL);
 }
+#endif
+
+#ifdef SINGLE_BUFFER
+VOID	freeBitMaps(struct BitMap *myBitMaps,
+#else
 VOID	freeBitMaps(struct BitMap **myBitMaps,
+#endif
 					LONG depth, LONG width, LONG height)
 {
+#ifdef SINGLE_BUFFER
+	freePlanes(myBitMaps, depth, width, height);
+	FreeMem(myBitMaps, (LONG)sizeof(struct BitMap));
+#else
 	freePlanes(myBitMaps[0], depth, width, height);
 	freePlanes(myBitMaps[1], depth, width, height);
 	freePlanes(myBitMaps[2], depth, width, height);
 	FreeMem(myBitMaps[0], (LONG)sizeof(struct BitMap));
 	FreeMem(myBitMaps[1], (LONG)sizeof(struct BitMap));
 	FreeMem(myBitMaps[2], (LONG)sizeof(struct BitMap));
+#endif
 }
+
+
 void FreeTempRP( struct RastPort *rp )
 {
 	if( rp )
@@ -156,22 +175,24 @@ static struct ScreenModeRequester *video_smr = NULL;
 int mode = 0;
 ULONG propertymask;
 
+#ifndef SINGLE_BUFFER
 struct RastPort temprp;
+#endif
 struct RastPort temprp2;
-struct MsgPort *ports[2];
 ULONG table[256*3+1+1];
 UBYTE toggle=0;
 
 void UpdateScreen_Video()
 {	
-	WriteChunkyPixels(&temprp2,0,0,WIDTH-1,HEIGHT-1,gfxbuf,vwidth);
+	WriteChunkyPixels(&temprp2,0,0,WIDTH-1,((HEIGHT)-1),gfxbuf,vwidth);
+#ifndef SINGLE_BUFFER
 	//WritePixelArray8(&temprp2,0,0,WIDTH-1,HEIGHT-1,gfxbuf,&temprp);
 	while (!ChangeScreenBuffer(screen,sb[toggle]))
 	WaitTOF();
 
 	toggle^=1;
 	temprp2.BitMap=myBitMaps[toggle];
-	
+#endif
 	Play_CDDA_again(); // To make sure we're using CDDA music again in a loop (if enabled)
 }
 
@@ -233,7 +254,16 @@ int Init_Video()
 	BIDTAG_Depth, 8,
 	BIDTAG_DIPFMustNotHave, propertymask,
 	TAG_DONE);
+	
+#ifdef SINGLE_BUFFER
+	myBitMaps = AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR);
+	InitBitMap(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+	setupPlanes(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+#endif
+	
+#ifndef SINGLE_BUFFER
 	if (NULL!=(myBitMaps=setupBitMaps(RBMDEPTH,RBMWIDTH,RBMHEIGHT)))
+#endif
 	{
 		if (screen = OpenScreenTags( NULL,
 		SA_Width, WIDTH,
@@ -242,12 +272,18 @@ int Init_Video()
 		SA_DisplayID, mode,
 		SA_Quiet, TRUE,
 		SA_Type, CUSTOMSCREEN|CUSTOMBITMAP,
+#ifdef SINGLE_BUFFER
+		SA_BitMap,myBitMaps,
+#else
 		SA_BitMap,myBitMaps[0],
+#endif
 		TAG_DONE))
 		{
 			vport = &screen->ViewPort;
+#ifndef SINGLE_BUFFER
 			sb[0] = AllocScreenBuffer(screen, myBitMaps[0],0);
 			sb[1] = AllocScreenBuffer(screen, myBitMaps[1],0);
+#endif
 			if (window = OpenWindowTags( NULL,
 			WA_CloseGadget, FALSE,
 			WA_DepthGadget, FALSE,
@@ -257,9 +293,9 @@ int Init_Video()
 			WA_Borderless, TRUE,
 			WA_NoCareRefresh, TRUE,
 			WA_SimpleRefresh, TRUE,
-			WA_RMBTrap, TRUE,
+			WA_RMBTrap, FALSE,
 			WA_Activate, TRUE,
-			WA_IDCMP, IDCMP_CLOSEWINDOW|IDCMP_MOUSEBUTTONS|IDCMP_RAWKEY,
+			WA_IDCMP, NULL,
 			WA_Width, WIDTH,/*WIDTH,   */
 			WA_Height, HEIGHT,/* HEIGHT,    */
 			WA_CustomScreen, screen,
@@ -270,12 +306,18 @@ int Init_Video()
 			}
 		}
 	}
+#ifndef SINGLE_BUFFER
 	InitRastPort(&temprp);
 	temprp.Layer=0;
 	temprp.BitMap=myBitMaps[2];
+#endif
 	InitRastPort(&temprp2);
 	temprp2.Layer=0;
+#ifdef SINGLE_BUFFER
+	temprp2.BitMap=myBitMaps;
+#else
 	temprp2.BitMap=myBitMaps[toggle^1];
+#endif
 	SetPointer(window,emptypointer,1,16,0,0);
 	
 	return 0;
@@ -459,7 +501,6 @@ void Stop_CDDA()
 	if (cdda_isplaying == 0) return;
 
 	cdda_isplaying = 0;
-	cdda_loop = 0;
 	AbortIO((struct IORequest *)cdda_io);
 }
 
@@ -476,10 +517,6 @@ void Play_CDDA_again()
 			if (cdda_loop == 1)
 			{
 				Play_CD_Track(cdda_currentrack, cdda_loop); // And replay it again
-			}
-			else
-			{
-				cdda_isplaying = 0;
 			}
 		}
 	}

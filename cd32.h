@@ -50,9 +50,11 @@
 #include <dos/dos.h>
 #include <libraries/lowlevel.h>
 
-
 #define LOOP_CDDA 1
 #define NOLOOP_CDDA 0
+
+// No Double buffering. Reduces memory consumption. (Especially useful on non extended CD32s)
+#define SINGLE_BUFFER 1
 
 #ifdef DEBUG
 #define LOG printf
