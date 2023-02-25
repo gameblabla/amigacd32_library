@@ -1,21 +1,15 @@
 #include "cd32.h"
 
-unsigned char cur_pal[768];
-
 struct AudioPCM pc;
+
+#define JOY1DAT 0xBFD400
+#define JOY1DAT_RED_BLUE 0xDFF00A
+
+
 void Check_input()
 {
 	uint32_t state0;
 	state0 = ReadJoyPort(0);
-	
-	if ((state0 & JPF_JOY_UP) == JPF_JOY_UP)
-	{
-		memset(gfxbuf, 0, 320*100);
-	}
-	else if ((state0 & JPF_JOY_DOWN) == JPF_JOY_DOWN)
-	{
-		memset(gfxbuf, 5, 320*100);
-	}
 	
 	if ((state0 & JPF_BUTTON_RED) == JPF_BUTTON_RED)
 	{
@@ -26,7 +20,7 @@ void Check_input()
 	if ((state0 & JPF_BUTTON_BLUE) == JPF_BUTTON_BLUE)
 	{
 		Play_CD_Track(2, LOOP_CDDA);
-		Play_PCM(&pc);
+		Play_PCM(&pc, -1);
 	}
 	
 /*
@@ -56,26 +50,17 @@ int main()
     ULONG size;
 	FILE* fp;
 
-	int ret = Init_Video();
+	int ret = Init_Video(320,256,320,256);
 	if (ret == 1) return 1;
 	
 	ret = Init_Audio();
 	if (ret == 1) return 1;
 
-    file = Open("image.raw", MODE_OLDFILE);
-    size = vwidth*vheight;
-	Read(file, gfxbuf, size);
-    Close(file);
-    
-	file = Open("image.pal", MODE_OLDFILE);
-    size = 768;
-    Read(file, cur_pal, size);
-    Close(file);
-
-	SetPalette_Video(cur_pal);
+    LoadFile_tobuffer("image.raw", gfxbuf);
+	LoadPalette_fromfile("image.pal");
 	
-	Load_PCM("sound.raw", &pc, -1, 11025, 0);
-	Play_PCM(&pc);
+	Load_PCM("sound.raw", &pc, 11025, 0);
+	Play_PCM(&pc, -1);
 	
 	Init_CD();
 	
@@ -85,6 +70,11 @@ int main()
 	{
 		Check_input();
 		UpdateScreen_Video();
+		CDDA_Loop_check();
 	}
+	
+	Clean_PCM(&pc);
+	Close_CD();
+	
 	return 0;
 }
