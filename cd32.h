@@ -53,6 +53,8 @@
 #include <dos/dos.h>
 #include <libraries/lowlevel.h>
 
+#define SINGLE_BUFFER 1
+
 #define LOOP_CDDA 1
 #define NOLOOP_CDDA 0
 
@@ -76,6 +78,9 @@ struct AudioPCM {
 extern uint8_t *gfxbuf;
 extern uint16_t internal_width;
 extern uint16_t internal_height;
+extern uint16_t vwidth;
+extern uint16_t vheight;
+extern struct RastPort temprp2;
 
 #define my_malloc(x) AllocMem(x, 0)
 
@@ -100,15 +105,21 @@ extern void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors);
  * Note that for CDDA music looping, this is also required to be called in a looping function.
  * 
 */
+#ifdef SINGLE_BUFFER
+#define UpdateScreen_Video() WriteChunkyPixels(&temprp2,0,0,WIDTH-1,((HEIGHT)-1),gfxbuf,vwidth);
+#else
 extern inline void UpdateScreen_Video();
-
+#endif
 /*
  * Flips only a selected part of the screen.
  * Useful if you only need to update a part of the screen.
  * For example, for a 3D game with a status bar, only update the status bar when it changes. 
 */
+#ifdef SINGLE_BUFFER
+#define UpdateScreen_Video_partial() WriteChunkyPixels(&temprp2,x,y,x+internal_width,y+internal_height,gfxbuf,w);
+#else
 extern inline void UpdateScreen_Video_partial(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
-
+#endif
 /*
  * Load a palette from file and applies it to the system palette.
  * 256 colors are expected. The palette file should be in the Game/ folder.
@@ -193,6 +204,10 @@ extern void Stop_CDDA();
  * Call this in a loop for CDDA looping to work properly. 
 */
 extern void CDDA_Loop_check();
+
+/* CDTV/CDXL stuff */
+
+extern void CDPLAYER_PlayVideo(LONG NumPlays, char* fname, uint32_t speed, uint_fast8_t InputStopPlayback);
 
 
 #endif

@@ -42,7 +42,12 @@ struct ViewPort *vport;
 struct RastPort *rport;
 struct Window *window = NULL;
 struct Screen *screen = NULL;
+#ifdef SINGLE_BUFFER
 struct BitMap *myBitMaps;
+#else
+struct BitMap **myBitMaps;
+struct ScreenBuffer *sb[2];
+#endif
 struct Library *IconBase = NULL;
 
 void CDDA_Loop_check();
@@ -73,11 +78,61 @@ LONG setupPlanes(struct BitMap *bitMap, LONG depth, LONG width, LONG height)
 	return(TRUE);
 }
 
-VOID	freeBitMaps(struct BitMap *myBitMaps, LONG depth, LONG width, LONG height)
+#ifndef SINGLE_BUFFER
+struct BitMap **setupBitMaps(LONG depth, LONG width, LONG height)
 {
+	static struct BitMap *myBitMaps[3];
+	if (NULL != (myBitMaps[0] = (struct BitMap *) AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR)))
+	{
+        		if (NULL != (myBitMaps[1]=(struct BitMap*)AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR)))
+		{
+		if (NULL != (myBitMaps[2]=(struct BitMap*)AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR)))
+		{
+			InitBitMap(myBitMaps[0], depth, width, height);
+			InitBitMap(myBitMaps[1], depth, width, height);
+           	InitBitMap(myBitMaps[2], depth, width, height);
+			if (0 != setupPlanes(myBitMaps[0], depth, width, height))
+			{
+				if (0 != setupPlanes(myBitMaps[1], depth, width, height))
+                {
+                				if (0 != setupPlanes(myBitMaps[2], depth, width, height))
+					return(myBitMaps);
+                    				   freePlanes(myBitMaps[1], depth, width, height);
+			    }
+        		 				    freePlanes(myBitMaps[0], depth, width, height);
+                    }
+		  			  FreeMem(myBitMaps[2], (LONG)sizeof(struct BitMap));
+		}
+	   			   FreeMem(myBitMaps[1], (LONG)sizeof(struct BitMap));
+	}
+		FreeMem(myBitMaps[0], (LONG)sizeof(struct BitMap));
+	}
+	return(NULL);
+}
+#endif
+
+#ifdef SINGLE_BUFFER
+VOID	freeBitMaps(struct BitMap *myBitMaps,
+#else
+VOID	freeBitMaps(struct BitMap **myBitMaps,
+#endif
+					LONG depth, LONG width, LONG height)
+{
+#ifdef SINGLE_BUFFER
+#warning "SINGLE BUFFER"
 	freePlanes(myBitMaps, depth, width, height);
 	FreeMem(myBitMaps, (LONG)sizeof(struct BitMap));
+#else
+	freePlanes(myBitMaps[0], depth, width, height);
+	freePlanes(myBitMaps[1], depth, width, height);
+	freePlanes(myBitMaps[2], depth, width, height);
+	FreeMem(myBitMaps[0], (LONG)sizeof(struct BitMap));
+	FreeMem(myBitMaps[1], (LONG)sizeof(struct BitMap));
+	FreeMem(myBitMaps[2], (LONG)sizeof(struct BitMap));
+#endif
 }
+
+
 
 void FreeTempRP( struct RastPort *rp )
 {
@@ -124,21 +179,38 @@ static UWORD __chip emptypointer[] =
 static struct ScreenModeRequester *video_smr = NULL;
 int mode = 0;
 ULONG propertymask;
-
+#ifndef SINGLE_BUFFER
+struct RastPort temprp;
+#endif
 struct RastPort temprp2;
 ULONG table[256*3+1+1];
 UBYTE toggle=0;
 
+#ifndef SINGLE_BUFFER
 inline void UpdateScreen_Video()
 {	
 	WriteChunkyPixels(&temprp2,0,0,WIDTH-1,((HEIGHT)-1),gfxbuf,vwidth);
+#ifndef SINGLE_BUFFER
+	while (!ChangeScreenBuffer(screen,sb[toggle]))
+	WaitTOF();
+
+	toggle^=1;
+	temprp2.BitMap=myBitMaps[toggle];
+#endif
 }
 
 inline void UpdateScreen_Video_partial(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {	
 	WriteChunkyPixels(&temprp2,x,y,x+internal_width,y+internal_height,gfxbuf,w);
-}
+#ifndef SINGLE_BUFFER
+	while (!ChangeScreenBuffer(screen,sb[toggle]))
+	WaitTOF();
 
+	toggle^=1;
+	temprp2.BitMap=myBitMaps[toggle];
+#endif
+}
+#endif
 
 void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors)
 {
@@ -159,13 +231,6 @@ void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors)
 
 int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 {
-	SysBase = *(struct ExecBase **)4;
-	if (!(SysBase->AttnFlags & AFF_68020))
-	{
-		LOG("This needs a 68020+ CPU!\n");
-		return 0;
-	}
-	
  	LowLevelBase 	= OpenLibrary("lowlevel.library",39);
 
 	if ((IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library",0)) == NULL)
@@ -191,22 +256,36 @@ int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 	BIDTAG_Depth, 8,
 	BIDTAG_DIPFMustNotHave, propertymask,
 	TAG_DONE);
-	
+		
+#ifdef SINGLE_BUFFER
 	myBitMaps = AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR);
 	InitBitMap(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
 	setupPlanes(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+#endif
 	
-	if (screen = OpenScreenTags( NULL,
+#ifndef SINGLE_BUFFER
+	if (NULL!=(myBitMaps=setupBitMaps(RBMDEPTH,RBMWIDTH,RBMHEIGHT)))
+#endif
+	{
+		if (screen = OpenScreenTags( NULL,
 		SA_Width, WIDTH,
 		SA_Height, HEIGHT,
 		SA_Depth, DEPTH,
 		SA_DisplayID, mode,
 		SA_Quiet, TRUE,
 		SA_Type, CUSTOMSCREEN|CUSTOMBITMAP,
+#ifdef SINGLE_BUFFER
 		SA_BitMap,myBitMaps,
+#else
+		SA_BitMap,myBitMaps[0],
+#endif
 		TAG_DONE))
 		{
 			vport = &screen->ViewPort;
+#ifndef SINGLE_BUFFER
+			sb[0] = AllocScreenBuffer(screen, myBitMaps[0],0);
+			sb[1] = AllocScreenBuffer(screen, myBitMaps[1],0);
+#endif
 			if (window = OpenWindowTags( NULL,
 			WA_CloseGadget, FALSE,
 			WA_DepthGadget, FALSE,
@@ -227,11 +306,20 @@ int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 				rport = window->RPort;
 				gfxbuf = AllocMem( sizeof(uint8_t)*(internal_width*internal_height), MEMF_PUBLIC|MEMF_CLEAR);
 			}
+		}
 	}
-
+#ifndef SINGLE_BUFFER
+	InitRastPort(&temprp);
+	temprp.Layer=0;
+	temprp.BitMap=myBitMaps[2];
+#endif
 	InitRastPort(&temprp2);
 	temprp2.Layer=0;
+#ifdef SINGLE_BUFFER
 	temprp2.BitMap=myBitMaps;
+#else
+	temprp2.BitMap=myBitMaps[toggle^1];
+#endif
 	SetPointer(window,emptypointer,1,16,0,0);
 	
 	// Check if we're NTSC or PAL

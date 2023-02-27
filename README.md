@@ -1,6 +1,6 @@
 # Amiga CD32 Homebrew small library (cd32.c)
 
-This comes with a small library called cd32.c that works with the recent GCC-based AmigaOS m68k cross compiler and VBCC. (Both are supported)
+This comes with a small library called cd32.c that works with the recent GCC-based AmigaOS m68k cross compiler.
 The goal is to be self contained and be relatively easy to use.
 
 You will need a file called "CD32.TM" otherwise the building process will fail.
@@ -16,12 +16,11 @@ You also need python2 to run the provided script.
 The idea is to have enough working to port simple framebuffer based games like Wolfenstein 3D.
 
 # Not (currently) supported
-
+- Hardware sprites (Something i would like to have partial support for at least)
 - HAM color modes
-- Hardware sprites
-- Amiga Copper
-- MOD/XM support (This is intended for the CD32, use CDDA for music. Worst case, looping samples if you have enough memory)
-- CDTV support (i may reconsider this in the future but this won't work for the scope of this project)
+- Amiga Copper (I'm not sure i'll ever come to this)
+- MOD/XM support (I need to integrate this :https://github.com/keirf/amiga-stuff/tree/master/testkit)
+- CDTV support
 
 Beyond that, the fact it uses the system libraries means it's not as optimal as it can be speed wise.
 
@@ -41,6 +40,12 @@ Signed 8-bits RAW MONO.
 
 The frequency can be configured at runtime but i would recommend something like 11025 or 22050.
 
+# CDXL
+
+There's a CDXL player in there but it's extremely finicky and doesn't work properly anyway...
+It seems to work properly only with HAM and low resolution videos.
+If you just need a video for an intro, i would recommend an external video player program instead.
+
 # Example program
 
 This shows off what the small CD32.c library supports :
@@ -48,7 +53,7 @@ This shows off what the small CD32.c library supports :
 - CDDA tracks
 - Loading an image from CD (as well as its palette file) and displaying it onscreen
 
-Feel free to modify it
+Feel free to modify it according to your needs.
 
 # Many thanks to
 

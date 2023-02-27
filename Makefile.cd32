@@ -1,12 +1,15 @@
 CC = m68k-amigaos-gcc -m68020
 EXE = game
 
-CFLAGS  = -Ofast -fipa-pta -fno-plt -fno-PIC -fno-stack-protector -flto
+CFLAGS  = -Ofast -fipa-pta -fno-plt -fno-PIC -fno-stack-protector -flto -mxgot -fipa-pta
+CFLAGS += -finline-limit=42 -ffast-math
+CFLAGS += -fno-common -fno-stack-protector -fno-guess-branch-probability -fno-caller-saves -fno-tree-loop-if-convert -fno-regmove
+
 STRIP = $(HOST)strip
 
-SRC = cd32.c main.c
+SRC = cd32.c main.c cdtv.c
 
-LDFLAGS = -lc -lgcc -lm -Wl,--as-needed -Wl,--gc-sections -s -flto
+LDFLAGS = -lgcc -Wl,--as-needed -Wl,--gc-sections -s -flto
 
 OBJ = $(SRC:.c=.o)
 

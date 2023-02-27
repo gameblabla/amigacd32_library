@@ -2,9 +2,6 @@
 
 struct AudioPCM pc;
 
-#define JOY1DAT 0xBFD400
-#define JOY1DAT_RED_BLUE 0xDFF00A
-
 
 void Check_input()
 {
@@ -48,10 +45,14 @@ int main()
 {
     BPTR file;
     ULONG size;
+    int ret;
 	FILE* fp;
 
-	int ret = Init_Video(320,256,320,256);
-	if (ret == 1) return 1;
+
+	Init_Video(320,256,320,256);
+	/* Not working properly for now. */
+	//CDPLAYER_PlayVideo(1, "vid.cdxl", 220, 1);
+	//Init_Video(320,256,320,256);
 	
 	ret = Init_Audio();
 	if (ret == 1) return 1;
