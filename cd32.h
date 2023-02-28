@@ -54,7 +54,6 @@
 #include <libraries/lowlevel.h>
 
 #define SINGLE_BUFFER 1
-
 #define LOOP_CDDA 1
 #define NOLOOP_CDDA 0
 
@@ -97,7 +96,7 @@ extern int Init_Video(uint16_t w, uint16_t h, uint16_t internal_width, uint16_t 
  * If the buffer is 8bpp but the palette only has 64 entries, adjust accordingly.
 */
 
-extern void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors);
+extern  void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors);
 
 /*
  * Flips the screen.
@@ -131,7 +130,7 @@ extern void LoadPalette_fromfile(const char* fname);
  * Use this for say, loading an image file to the screen buffer for instance.
  * That said, it can also be used for other things too. (For example loading a text file)
 */
-extern void LoadFile_tobuffer(const char* fname, uint8_t* buffer);
+extern ULONG LoadFile_tobuffer(const char* fname, uint8_t* buffer);
 
 /*
  * Call this to use the PCM related functions.
@@ -165,6 +164,16 @@ extern void Stop_PCM(struct AudioPCM* pcm);
 
 /* Frees the memory that was allocated to it (the buffer inside the structure that is). */
 extern void Clean_PCM(struct AudioPCM* pcm);
+
+// Does not link right now due to issues
+#ifdef MOD_PLAYER
+extern void Load_MOD(char* fname);
+extern void Play_MOD();
+extern void Stop_MOD();
+extern void Free_MOD();
+extern void Resume_MOD();
+extern void Pause_MOD();
+#endif
 
 // CDDA
 

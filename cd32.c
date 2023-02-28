@@ -13,7 +13,6 @@
 
 #include "cd32.h"
 
-
 #define DEPTH 8
 #define RBMDEPTH 8
 #define ID_BNG   4
@@ -32,8 +31,12 @@ uint16_t internal_height;
 // Global, used for holding buffer.
 uint8_t *gfxbuf = NULL;
 
+static uint8_t is_pal;
+
 static LONG amiga_clock = 3546895; // For PAL. For NTSC : 3579545
 
+
+static volatile struct Custom* custom;
 struct IntuitionBase	*IntuitionBase = NULL;
 struct GfxBase			*GfxBase = NULL;
 struct Library			*LowLevelBase = NULL;
@@ -119,7 +122,6 @@ VOID	freeBitMaps(struct BitMap **myBitMaps,
 					LONG depth, LONG width, LONG height)
 {
 #ifdef SINGLE_BUFFER
-#warning "SINGLE BUFFER"
 	freePlanes(myBitMaps, depth, width, height);
 	FreeMem(myBitMaps, (LONG)sizeof(struct BitMap));
 #else
@@ -183,7 +185,6 @@ ULONG propertymask;
 struct RastPort temprp;
 #endif
 struct RastPort temprp2;
-ULONG table[256*3+1+1];
 UBYTE toggle=0;
 
 #ifndef SINGLE_BUFFER
@@ -214,7 +215,9 @@ inline void UpdateScreen_Video_partial(uint16_t x, uint16_t y, uint16_t w, uint1
 
 void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors)
 {
-    UWORD i;
+#if 1
+    uint_fast16_t i;
+    ULONG table[256*3+1+1];
     table[0]=(numberofcolors<<16)|0;
 	for (i = 0; i < numberofcolors; i++)
     {
@@ -225,27 +228,84 @@ void SetPalette_Video(const uint8_t *palette, uint16_t numberofcolors)
     }    
     table[1+numberofcolors*3] = 0;  
     LoadRGB32(vport,table);
-}
+#endif
+/*
+#if 0
+		volatile struct Custom* custom = (volatile struct Custom*) 0xDFF000;
+		UWORD colorIndex;
+		uint8_t palette[256 * 3];
+		
+		memcpy(palette, pal, 256 * 3);
+		
+		volatile uint16_t* const DMACONW     = (uint16_t* const) 0xDFF096;
+		volatile uint16_t* const INTENAW     = (uint16_t* const) 0xDFF09A;
+		volatile uint16_t* const INTREQW     = (uint16_t* const) 0xDFF09C;
 
-/* Init Video library, errors out if it encounters issues */
+        //*INTREQW = 0x7FFF; // Idem. Original Scoopex code do this twice. I have removed without problems.
+        *DMACONW = 0x7FFF; // Disable all bits in DMACON
+        *DMACONW = 0x87E0; // Setting DMA channels
+		
+		*(volatile uint16_t *)0xDFF000 = 0xfff;
+		
+		// Save the existing bplcon3 settings
+		ULONG origBplcon3 = custom->bplcon3;
+
+		// Loop through all palettes
+		for (UWORD paletteIndex = 0; paletteIndex < 8; paletteIndex++) {
+			// Select the current palette
+			custom->bplcon3 = (origBplcon3 & ~(0b111 << 13)) | (paletteIndex << 13);
+
+			// Clear LOCT bit
+			custom->bplcon3 = origBplcon3 & ~(1 << 9);
+
+			// Set the high nibbles of each color component
+			for (colorIndex = 0; colorIndex < 32; colorIndex++) {
+				custom->color[colorIndex] = ((palette[colorIndex * 3 + 0] & 0xF0) << 4) |
+											((palette[colorIndex * 3 + 1] & 0xF0) << 0) |
+											((palette[colorIndex * 3 + 2] & 0xF0) >> 4);
+			}
+
+			// Set LOCT bit
+			custom->bplcon3 = origBplcon3 | (1 << 9);
+
+			// Set the low nibbles of each color component
+			for (colorIndex = 0; colorIndex < 32; colorIndex++) {
+				custom->color[colorIndex] = ((palette[colorIndex * 3 + 0] & 0x0F) << 8) |
+											((palette[colorIndex * 3 + 1] & 0x0F) << 4) |
+											((palette[colorIndex * 3 + 2] & 0x0F) << 0);
+			}
+		}
+
+		// Restore the original bplcon3 settings
+		custom->bplcon3 = origBplcon3;
+    
+#endif
+*/
+}
 
 int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 {
- 	LowLevelBase 	= OpenLibrary("lowlevel.library",39);
+	/* I would love so much not having to depend on NDK and use direct hardware access... */
+ 	if (!LowLevelBase) LowLevelBase 	= OpenLibrary("lowlevel.library",39);
 
-	if ((IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library",0)) == NULL)
+	if (!IntuitionBase)
 	{
-		LOG("No intution library\n");
-		return 1;
-	}
-
-	/* Open graphics.library */
-	if ((GfxBase = (struct GfxBase *) OpenLibrary("graphics.library", 0)) == NULL)
-	{
-		LOG("No graphics library\n");
-		return 1;
+		if ((IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library",0)) == NULL)
+		{
+			LOG("No intution library\n");
+			return 1;
+		}
 	}
 	
+	/* Open graphics.library */
+	if (!GfxBase)
+	{
+		if ((GfxBase = (struct GfxBase *) OpenLibrary("graphics.library", 0)) == NULL)
+		{
+			LOG("No graphics library\n");
+			return 1;
+		}
+	}
 	vwidth = w;
 	vheight = h;
 	internal_width = iwidth;
@@ -257,10 +317,14 @@ int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 	BIDTAG_DIPFMustNotHave, propertymask,
 	TAG_DONE);
 		
+		
 #ifdef SINGLE_BUFFER
-	myBitMaps = AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR);
-	InitBitMap(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
-	setupPlanes(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+	if (!myBitMaps)
+	{
+		myBitMaps = AllocMem((LONG)sizeof(struct BitMap), MEMF_CHIP|MEMF_CLEAR);
+		InitBitMap(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+		setupPlanes(myBitMaps, RBMDEPTH, RBMWIDTH, RBMHEIGHT);
+	}
 #endif
 	
 #ifndef SINGLE_BUFFER
@@ -323,9 +387,8 @@ int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 	SetPointer(window,emptypointer,1,16,0,0);
 	
 	// Check if we're NTSC or PAL
-    struct ViewPort* vp = &(((struct Screen*)GfxBase->ActiView)->ViewPort);
-    ULONG modeid = GetVPModeID(vp);
-    if (modeid == LORESLACE_KEY || modeid == HIRESLACE_KEY || modeid == SUPERLACE_KEY) {
+	is_pal = (((struct GfxBase *) GfxBase)->DisplayFlags & PAL) == PAL;
+    if (is_pal) {
         amiga_clock = 3546895; // We are in PAL mode
     } else {
 		amiga_clock = 3579545;
@@ -336,7 +399,7 @@ int Init_Video(uint16_t w, uint16_t h, uint16_t iwidth, uint16_t iheight)
 
 /* Drawing stuff */
 
-void LoadFile_tobuffer(const char* fname, uint8_t* buffer)
+ULONG LoadFile_tobuffer(const char* fname, uint8_t* buffer)
 {
     BPTR file;
     ULONG size;
@@ -346,6 +409,8 @@ void LoadFile_tobuffer(const char* fname, uint8_t* buffer)
     size = Seek(file, 0, OFFSET_BEGINNING);
     Read(file, buffer, size);
     Close(file);
+    
+    return size;
 }
 
 void LoadPalette_fromfile(const char* fname)
@@ -365,11 +430,68 @@ void LoadPalette_fromfile(const char* fname)
 
 
 /* AUDIO PART */
+#ifndef MOD_PLAYER
 static UBYTE channelPriority[] = { 1, 2, 4, 8 }; //request any available channel
 static struct IOAudio *AudioIO[4]; //I/O block for I/O commands
 static struct MsgPort *AudioMP[4]; //Message port for replies
 static struct Message *AudioMSG[4];//Reply message ptr
 static ULONG device[4];
+#else
+#include "ptplayer.h"
+ULONG mod_size;
+UBYTE *mod_data = NULL;
+void *p_samples = NULL;
+UBYTE start_pos = 0;
+__chip UBYTE* mod_data;
+
+void Load_MOD(char* fname)
+{
+	BPTR file;
+	if (mod_data) return;
+	
+	file = Open(fname, MODE_OLDFILE);
+    Seek(file, 0, OFFSET_END);
+    mod_size = Seek(file, 0, OFFSET_BEGINNING);
+    mod_data = AllocMem(mod_size, MEMF_CHIP|MEMF_CLEAR);
+    Read(file, mod_data, mod_size);
+    Close(file);
+    
+    mt_init(&custom, mod_data, p_samples, start_pos);
+    mt_Enable = 0;
+}
+
+
+void Play_MOD()
+{
+	mt_Enable = 1;
+}
+
+void Pause_MOD()
+{
+	mt_Enable = 0;
+}
+
+void Resume_MOD()
+{
+	mt_Enable = 1;
+}
+
+
+void Stop_MOD()
+{
+	mt_Enable = 0;
+}
+
+
+void Free_MOD()
+{
+    mt_Enable = 0;
+    mt_end(&custom);
+    mt_remove_cia(&custom);
+    if (mod_data) FreeMem(mod_data, mod_size);
+}
+
+#endif
 
 void Load_PCM(char* filename, struct AudioPCM* pcm, uint16_t frequency, uint8_t assigned_channel)
 {
@@ -393,6 +515,9 @@ void Load_PCM(char* filename, struct AudioPCM* pcm, uint16_t frequency, uint8_t 
 
 void Play_PCM(struct AudioPCM* pcm, int16_t repeat)
 {
+#ifdef MOD_PLAYER
+	mt_soundfx(&custom,(BYTE *) pcm->pcmData, pcm->size >> 1, amiga_clock / (pcm->frequency), 64);
+#else
 	pcm->duration = repeat;
 	
     //Set up the Audio I/O block to play our sound
@@ -407,14 +532,20 @@ void Play_PCM(struct AudioPCM* pcm, int16_t repeat)
 	AudioIO[pcm->assigned_channel]->ioa_Cycles = pcm->duration;
 
     BeginIO((struct IORequest *)AudioIO[pcm->assigned_channel]);
+#endif
 }
 
 void Stop_PCM(struct AudioPCM* pcm)
 {
+#ifdef MOD_PLAYER
+	mt_stopfx(&custom, pcm->assigned_channel);
+#else
 	AbortIO((struct IORequest *)AudioIO[pcm->assigned_channel]);
 	pcm->duration = 0; // Needed to stop PCM sample although it may not immediatly stop right away
+#endif
 }
 
+// This applies for both PTPlayer and Native
 void Clean_PCM(struct AudioPCM* pcm)
 {
 	if (!pcm) return;
@@ -428,7 +559,11 @@ void Clean_PCM(struct AudioPCM* pcm)
 
 int Init_Audio()
 {
-	int i;
+#ifdef MOD_PLAYER
+	is_pal = (((struct GfxBase *) GfxBase)->DisplayFlags & PAL) == PAL;
+    mt_install_cia(&custom, NULL, is_pal);
+#else
+	uint_fast8_t i;
     //Create the reply port
     for(i=0;i<4;i++)
     {
@@ -463,9 +598,17 @@ int Init_Audio()
 	}
     
 	LOG("Device %s opened. Allocated a channel.\n", AUDIONAME);
+#endif
 	return 0;
 }
 
+void Close_Audio()
+{
+#ifdef MOD_PLAYER
+	mt_remove_cia(&custom);
+#endif
+	// TODO for rest of audio
+}
 
 static struct IOStdReq     *cdda_io;
 struct MsgPort      *cdda_mp;

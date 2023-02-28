@@ -1,7 +1,8 @@
 CC = vc +aos68k
+AS = vasmm68k_mot
 EXE = game
 
-CFLAGS	= -Os -size -const-in-data -sd -no-intz -cpu=68020 -I/opt/amiga/m68k-amigaos/vbcc/include -I/opt/amiga/m68k-amigaos/ndk-include
+CFLAGS	= -Os -size -const-in-data -sd -no-intz -cpu=68020 -I/opt/amiga/m68k-amigaos/vbcc/include -I/opt/amiga/m68k-amigaos/ndk-include -DMOD_PLAYER
 
 SRC = cd32.c main.c
 
@@ -9,13 +10,16 @@ LDFLAGS = -lamiga
 
 OBJ = $(SRC:.c=.o)
 
-all : $(SRC) $(EXE)
+all : sound_player $(SRC) $(EXE)
 
 $(EXE): $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJ) ptplayer.o -o $@ $(LDFLAGS)
 	
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
+
+sound_player:
+	$(AS) -Faout -devpac -o ptplayer.o ptplayer.asm
 
 clean:
 	rm -rf $(OBJ) $(EXE) *.iso cdda.raw
