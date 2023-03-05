@@ -4,4 +4,11 @@ cdda.raw
 *.iso
 *.a
 ./game
+./src/game
+src/*.o
+src/*.iso
+src/*.a
+src/*.raw
+src/*.TM
+CDTV.TM
 cdda_cd32/Game/game

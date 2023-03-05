@@ -1,6 +1,16 @@
 #include "cd32.h"
+#include "audio_paula.h"
 
 struct AudioPCM pc;
+struct ImageVSprite img; // Only used for the non-Akiko version
+
+// Whenever to use AKIKO or the OS's own Blitter functions
+// On an Amiga without the Akiko, it will revert back to slower CPU-based C2P
+// I may add a CPU fallback for 680/40/60 Amigas out there
+// (or even Amiga CD32's with 50mhz 68030s)
+#define AKIKO 1
+// Whenever we should playback the video upon bootup
+#define VIDEO_PLAYBACK 0
 
 void Check_input()
 {
@@ -46,41 +56,46 @@ void Check_input()
 
 int main()
 {
-    BPTR file;
-    ULONG size;
-    int ret;
-	FILE* fp;
-
-	Init_Video(320,256,320,256);
+	Init_Video(320,256,320,256, AKIKO);
 	Init_Audio();
 	Init_CD();
-#ifdef VIDEO_PLAYBACK
+	
+#if VIDEO_PLAYBACK == 1
 	CDPLAYER_PlayVideo(1, "vid.cdxl", 220, 1);
-	Init_Video(320,256,320,256); /* For whatever reason, this is needed */
+	Init_Video(320,256,320,256, AKIKO); /* For whatever reason, this is needed */
 #endif
 
+#if AKIKO == 1
+	// Simply export a 256 colors image with GIMP as RAW and it will output RAW/PAL files
     LoadFile_tobuffer("image.raw", gfxbuf);
-	LoadPalette_fromfile("image.pal");
+	LoadPalette_fromfile_RAW("image.pal");
+#else
+	//amigeconv -f bitplane -d 8 -l amiga8.png amiga8.raw
+	// Frames must be non interleaved unlike CDTV version (for speed reasons)
+	LoadImage_native("amiga8.raw", &img, 320, 256);
+	//amigeconv -f palette -p loadrgb32 amiga8.png amiga8.pal
+	LoadPalette_fromfile_LoadRGB("amiga8.pal");
+#endif
 
 	Load_PCM("sound.raw", &pc, 11025, 0);
 	
-	/* There's nothing preventing you from playing both CDDA and a MOD track file at the same time !
-	 * But PTPlayer does have a small performance impact so preferably, you should stick with
-	 * CDDA music... unless of course, you are concerned about space being allocated to music
-	 * and would rather use that space for other things. (namely CDXL videos !)
-	 * */
 #ifdef MOD_PLAYER
 	Load_MOD("mymod.mod");
 	Play_MOD();
-#else
-	BOOL success = Play_CD_Track(2, LOOP_CDDA);
 #endif
+	BOOL success = Play_CD_Track(2, LOOP_CDDA);
 
 	while(1)
 	{
-		Check_input();
-		UpdateScreen_Video();
 		CDDA_Loop_check();
+		Check_input();
+		
+#if AKIKO == 1
+		Draw_Video_Akiko();
+#else
+		DrawImage_native(img);
+#endif
+		Update_Video();
 	}
 	
 	Clean_PCM(&pc);

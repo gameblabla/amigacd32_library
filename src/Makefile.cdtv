@@ -1,24 +1,24 @@
-CC = m68k-amigaos-gcc -m68020
+CC = m68k-amigaos-gcc -m68000
 AS = vasmm68k_mot
 # TODO : Convert PTPLAYER to GAS
 
 EXE = game
 
 CFLAGS  = -Os -fomit-frame-pointer -fipa-pta -fno-plt -fno-PIC -fno-stack-protector -flto -mxgot -fipa-pta -Iinclude
-CFLAGS += -finline-limit=42 -ffast-math
+CFLAGS += -finline-limit=42 -ffast-math 
 CFLAGS += -fno-common -fno-stack-protector -fno-guess-branch-probability -fno-caller-saves -fno-tree-loop-if-convert -fno-regmove
 
-CFLAGS += -DMOD_PLAYER
+CFLAGS += -DMOD_PLAYER -DCDTV
 
 STRIP = $(HOST)strip
 
-SRC = cd32.c main.c cdtv.c
+SRC = cdtv.c main_cdtv.c audio_paula.c
 
 LDFLAGS = -noixemul -lgcc -Wl,--as-needed -Wl,--gc-sections -s -flto
 
 OBJ = $(SRC:.c=.o)
 
-all : $(SRC) $(EXE)
+all : sound_player $(SRC) $(EXE)
 
 $(EXE): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) ptplayer.o -o $@ $(LDFLAGS)

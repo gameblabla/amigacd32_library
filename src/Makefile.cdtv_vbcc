@@ -1,0 +1,25 @@
+CC = vc +aos68k
+AS = vasmm68k_mot
+EXE = game
+
+CFLAGS	= -Os -size -const-in-data -sd -no-intz -cpu=68000 -I/opt/amiga/m68k-amigaos/vbcc/include -I/opt/amiga/m68k-amigaos/ndk13-include -DMOD_PLAYER
+
+SRC = cdtv.c audio_paula.c main_cdtv.c
+
+LDFLAGS = -lamiga
+
+OBJ = $(SRC:.c=.o)
+
+all : sound_player $(SRC) $(EXE)
+
+$(EXE): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) ptplayer.o -o $@ $(LDFLAGS)
+	
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
+sound_player:
+	$(AS) -Faout -devpac -o ptplayer.o ptplayer.asm
+
+clean:
+	rm -rf $(OBJ) $(EXE) *.iso cdda.raw

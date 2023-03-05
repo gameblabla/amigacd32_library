@@ -83,7 +83,7 @@
 
 #include <clib/alib_protos.h>
 
-#include "internal_cdtv.h"
+#include "internal_cdxl.h"
 #include "pan.h"
 
 #include <intuition/intuition.h>

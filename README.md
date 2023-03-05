@@ -6,12 +6,15 @@ The goal is to be self contained and be relatively easy to use.
 You will need a file called "CD32.TM" otherwise the building process will fail.
 You also need python2 to run the provided script.
 
+Eventually i hope to support the CDTV as well (already sort of working, at least code wise. Only tested though CD32).
+
 # Currently supported
 
 - Displaying to the 8bpp framebuffer (a buffer is made available for this purpose)
 - Playing PCM tracks on all 4 channels (Either ptplayer or NDK)
-- MOD support through ptplayer (requires building with VASM, if you don't like that, there's another audio codepath without it)
+- MOD support through ptplayer (requires building with VASM, if you don't like that, there's another audio codepath without it with OS calls)
 - CDDA tracks
+- System Blitter calls for drawing images
 - Really basic CDXL support (comes from Amiga Developer CD)
 - Basic input support (Actually provided by the AmigaOS SDK as they are quite basic enough)
 
@@ -20,7 +23,16 @@ You also need python2 to run the provided script.
 - HAM color modes
 - Amiga Copper (I'm not sure i'll ever come to this)
 
-Check out DOCUMENTATION.md if you want to know more about it.
+
+# Documentation
+
+[Main Document (Summary)](https://github.com/gameblabla/amigacd32_library/blob/simp/docs/DOCUMENTATION.md)
+
+[CDTV](https://github.com/gameblabla/amigacd32_library/blob/simp/docs/CDTV.md)
+
+[GCC tricks](https://github.com/gameblabla/amigacd32_library/blob/simp/docs/GCC_tricks.md)
+
+[TODO list](https://github.com/gameblabla/amigacd32_library/blob/simp/docs/TODO.md)
 
 # Many thanks to
 
