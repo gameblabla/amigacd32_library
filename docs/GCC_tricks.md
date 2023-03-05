@@ -27,14 +27,20 @@ Under some circumstances -Ofast may be ideal too so it mostly a matter of strate
 
 Here are some other essential ones:
 -mxgot is perhaps the most important and the one with the most performance impact, you want to have this enabled by default.
+
 -fipa-pta has been noticed to have a small performance improvement on MIPS32 and ARM.
+
 -fno-exceptions & -fno-rtti for C++ projects. If the compiler complains, you may have to remove the exceptions.
+
 -fno-common is not turned on by default in GCC6.
+
 -noixemul will prevent the linker from linking to ixemul. Note that if your game no longer boots, it might need it especially if your game relies on libc.
+
 -flto for LTO. Make sure to pass your CFLAGS opts to the linker too with GCC.
 
 Do not use
 -malign-int is useful as the M68k will be slower on unaligned access but this may cause breakage.
+
 However, it causes the palette to break. (I will fix that hopefully)
 
 # Switch statement
